@@ -1,60 +1,110 @@
-from dash import Dash, html, dcc # We import Dash tools to build our website layout
-import plotly.express as px # Plotly is the artist that draws our pretty charts
-import pandas as pd # Pandas is our spreadsheet manager
+from dash import Dash, html, dcc, Input, Output, callback # We bring in our tools to build the website and make it interactive
+import plotly.express as px # Plotly is our artist for drawing the line charts
+import pandas as pd # Pandas is our super-smart spreadsheet assistant
 
 # --- STEP 1: LOAD AND PREPARE THE DATA ---
-# We load our clean 'formatted_data.csv' that we made in the last task.
+# This part is like opening our book of sales and making sure it's ready to read.
+
+# We read the 'formatted_data.csv' file that has all our Pink Morsel sales info.
 df = pd.read_csv("formatted_data.csv")
 
-# We need to make sure the computer knows the "Date" column is actually about calendar time!
-# Otherwise, it might just see it as words.
+# We tell the computer that the 'Date' column is about time, not just random text.
+# This helps it put everything in the right calendar order!
 df["Date"] = pd.to_datetime(df["Date"])
 
-# We sort the dates from oldest to newest so the line chart flows correctly.
-# It's like putting your baby photos in order from birth to today!
+# We sort the dates from the oldest to the newest so the chart flows smoothly from left to right.
 df = df.sort_values(by="Date")
 
-# --- STEP 2: CREATE THE CHART ---
-# We use 'px.line' to create a line chart.
-# x="Date": The timeline goes across the bottom.
-# y="Sales": The money goes up and down the side.
-# title="Pink Morsel Sales": A clear name for our chart.
-fig = px.line(df, x="Date", y="Sales", title="Pink Morsel Sales Over Time")
-
-# We want to highlight Jan 15, 2021, because that's when the price changed!
-# We add a vertical line (vline) to the chart like a "Before/After" marker.
-fig.add_vline(x="2021-01-15", line_width=3, line_dash="dash", line_color="red")
-fig.add_annotation(x="2021-01-15", y=max(df["Sales"]), text="Price Increase", showarrow=True, arrowhead=1)
-
-# We add clear labels for the axes so anyone reading it knows what the lines mean.
-fig.update_layout(
-    xaxis_title="Date (Timeline)",
-    yaxis_title="Total Sales (Money Made)",
-    font=dict(family="Arial", size=14, color="black")
-)
-
-# --- STEP 3: BUILD THE APP LAYOUT ---
-# This is how we organize things on the screen.
+# --- STEP 2: BUILD THE APP LAYOUT ---
+# Think of this as the 'Skeleton' or the 'Blueprint' of our website.
 app = Dash(__name__)
+app.title = "Pink Morsel Sales Visualizer"
 
-# 'app.layout' is like the blueprint for our webpage.
-# html.Div is like a 'container' or 'box' holding everything together.
-app.layout = html.Div(children=[
-    # html.H1 is a 'Header 1' - it's the biggest, boldest text at the top!
-    html.H1(children='Pink Morsel Visualizer', style={'textAlign': 'center', 'color': '#003366'}),
+# 'app.layout' is where we define what goes where on the screen.
+app.layout = html.Div(id="app-container", children=[
     
-    # html.P is a 'Paragraph' for adding a little explanation.
-    html.P(children='A chart showing when sales were highest for Soul Foods.', style={'textAlign': 'center'}),
+    # 1. THE HEADER: The title at the top of the page.
+    # We wrap it in a 'glass-card' Div to give it that cool frosted-glass look!
+    html.Div(className="glass-card", children=[
+        html.H1(children='Pink Morsel Sales Visualizer'),
+        html.P(children='Use the buttons below to switch between different sales regions.')
+    ]),
 
-    # dcc.Graph is where our Plotly figure (fig) gets displayed.
-    dcc.Graph(
-        id='sales-line-chart',
-        figure=fig
-    )
+    # 2. THE CONTROL PANEL: This is where the user can click buttons.
+    # We use 'dcc.RadioItems' for our list of regions.
+    html.Div(className="glass-card", children=[
+        html.Label("Select Region:", style={'fontWeight': 'bold', 'marginBottom': '10px', 'display': 'block'}),
+        dcc.RadioItems(
+            id='region-filter', # This is the ID so the callback (the brain) can find it!
+            options=[
+                {'label': 'North', 'value': 'north'},
+                {'label': 'East', 'value': 'east'},
+                {'label': 'South', 'value': 'south'},
+                {'label': 'West', 'value': 'west'},
+                {'label': 'All', 'value': 'all'}
+            ],
+            value='all', # We start with 'all' so the user seeing everything at first.
+            className='radio-group', # This connects to our style.css file!
+            labelStyle={'display': 'inline-block', 'marginRight': '20px'},
+            inputClassName='radio-input', # Styles the little circle button
+            labelClassName='radio-label'  # Styles the text next to the button
+        )
+    ]),
+
+    # 3. THE GRAPH AREA: A big box where our chart will live.
+    html.Div(className="glass-card", children=[
+        # 'dcc.Graph' is like a blank canvas waiting for our callback to draw on it.
+        dcc.Graph(id='sales-line-chart', className='chart-container')
+    ])
 ])
 
+# --- STEP 3: THE BRAIN (Interactivity) ---
+# This is a 'Callback' - it's like a rule that says: 
+# "Whenever the user clicks a button, run this code and update the chart!"
+
+@callback(
+    # Output: We want to change the 'figure' (the chart) of the 'sales-line-chart'.
+    Output('sales-line-chart', 'figure'),
+    # Input: We are watching the 'value' of the 'region-filter' buttons.
+    Input('region-filter', 'value')
+)
+def update_graph(selected_region):
+    # This function runs every single time a radio button is clicked!
+    
+    # A. Filtering: We only keep the data the user asked for.
+    if selected_region == 'all':
+        filtered_df = df # If they pick 'all', we don't change anything.
+    else:
+        # If they pick a region (like 'north'), we only keep the rows for that region.
+        filtered_df = df[df["Region"] == selected_region]
+
+    # B. Drawing: We create a new line chart with the chosen data.
+    fig = px.line(
+        filtered_df, 
+        x="Date", 
+        y="Sales", 
+        title=f"Pink Morsel Sales: {selected_region.capitalize()}"
+    )
+
+    # C. Adding the Marker: We add the red dotted line at Jan 15, 2021.
+    # This is when the price went up, so we want to see what happened before and after!
+    fig.add_vline(x="2021-01-15", line_width=2, line_dash="dash", line_color="#ff4d4d")
+    
+    # D. Styling the Chart: We make sure the chart matches our beautiful website design.
+    fig.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',  # Makes the chart background see-through
+        paper_bgcolor='rgba(0,0,0,0)', # Makes the paper background see-through
+        font_color='#f8fafc',          # Sets the text to a nice off-white color
+        xaxis=dict(showgrid=False),    # Removes the vertical lines from the chart
+        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'), # Subtly keeps horizontal lines
+        margin=dict(l=40, r=40, t=60, b=40)
+    )
+
+    return fig # We send the finished chart back to the website!
+
 # --- STEP 4: RUN THE APP ---
-# This part tells Python to actually start the web server so we can see the app!
 if __name__ == '__main__':
-    # 'debug=True' is a helper mode that lets us see errors easily if something goes wrong.
+    # This starts our local web server so we can visit the site in our browser.
     app.run(debug=True)
+
+
