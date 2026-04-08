@@ -26,7 +26,7 @@ app.layout = html.Div(id="app-container", children=[
     # 1. THE HEADER: The title at the top of the page.
     # We wrap it in a 'glass-card' Div to give it that cool frosted-glass look!
     html.Div(className="glass-card", children=[
-        html.H1(children='Pink Morsel Sales Visualizer'),
+        html.H1(children='Pink Morsel Sales Visualizer', id='header'),
         html.P(children='Use the buttons below to switch between different sales regions.')
     ]),
 
